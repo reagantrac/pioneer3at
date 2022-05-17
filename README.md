@@ -2,7 +2,7 @@
 Work in progress.
 
 ## 1. ROS Installation
-1.1 Must use Ubuntu 20.04 (VM is Ok)
+1.1 Must use Ubuntu 20.04 (VM is Ok), need plenty of space (approx. 4GB not including OS)
 
 1.2 sudo sh -c 'echo "deb http://packages.ros.org/ros/ubuntu $(lsb_release -sc) main" > /etc/apt/sources.list.d/ros-latest.list'
 
