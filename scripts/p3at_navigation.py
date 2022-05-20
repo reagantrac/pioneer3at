@@ -4,45 +4,42 @@ import rospy
 
 from std_msgs.msg import Bool, String
 from geometry_msgs.msg import Vector3
+import math
 
 waypoints = {
-	"somewhere_along_the_way": {
-		"longitude": 115.8174289881738,
-		"latitude": -31.98012500998101,
-		"altitude": 5.72848845264015,
-		"heading": 0.6888631848299723,
-		"tilt": 11.32096947939711,
-		"range": 149.1389400931621
-	},
-	"maybe_a_scoreboard": {
-		"longitude": 115.8168865506287,
-		"latitude": -31.98036594019854,
-		"altitude": 12.24615573627041,
-		"heading": -103.1012512137992,
-		"tilt": 65.86535867124761,
-		"range": 107.3211504674873
-	},
-	"home_sweet_home": {
-		"longitude": 115.8172200827809,
-		"latitude": -31.98100166177344,
-		"altitude": 20.70200454005209,
-		"heading": -17.917006228234,
-		"tilt": 27.10139975787505,
-		"range": 76.51809774075446
-	},
+	"somewhere_along_the_way": 		{"longitude": 115.8171782781675, "latitude": -31.98038731577529},
+	"maybe_a_scoreboard":      		{"longitude": 115.8171702857572, "latitude": -31.98017884452402},
+	"home_sweet_home": 		  		{"longitude": 115.8171314540043, "latitude": -31.98082891705035},
+	"rallying_point":  		   		{"longitude": 115.8171660979887, "latitude": -31.98057735055060},
+	"let_s_have_a_little_stroll": 	{"longitude": 115.8174656945906, "latitude": -31.98081842250873},
+	"supporter_united": 			{"longitude": 115.8175647311226, "latitude": -31.98041252344407},
+	"coffee_time": 					{"longitude": 115.8197862220968, "latitude": -31.98052211397503},
 }
 
 timer = 0
 linear = 0
 angular = 0
 automatic = False
-coord = [0.0,0.0]
+position = [0.0,0.0]
 
 selected_waypoint = 0
 executing_waypoint = False
-
-def distance_to_waypoint(gps1, gps2):
-	pass
+	
+def gps_distance(point1, point2):
+	lat1 = math.radians(point1["latitude"])
+	lon1 = math.radians(point1["longitude"])
+	lat2 = math.radians(point2["latitude"])
+	lon2 = math.radians(point2["longitude"])
+	dlat = (lat2-lat1)
+	dlon = (lon2-lon1)
+	a = math.sin(dlat/2)**2  + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
+	c = 2 * math.atan2(math.sqrt(a), math.sqrt(1-a))
+	dist = 6371e3*c
+	
+	y = math.sin(dlon) * math.cos(lat2)
+	x = math.cos(lat1)*math.sin(lat2) - math.sin(lat1)*math.cos(lat2)*math.cos(dlon)
+	ang = math.atan2(y, x)
+	return dist, ang, -dist*math.cos(ang), dist*math.sin(ang)
 
 def is_alive(data):
 	global timer
@@ -74,13 +71,15 @@ def manual_cmd(data):
 		angular = data.y
 
 def drive_mode(data):
-	pass
+	global automatic
+	automatic = not automatic
 
 def navigation():
 	global timer, linear, angular
 
 	drive_cmd = rospy.Publisher("/p3at/drive_cmd", Vector3, queue_size=1)
 	
+	#print(gps_distance(waypoints["maybe_a_scoreboard"], waypoints["somewhere_along_the_way"]))
 
 	rospy.init_node("p3at_navigation")
 	
@@ -96,7 +95,6 @@ def navigation():
 		d = Vector3()
 		d.x = linear
 		d.y = angular
-		d.z = 0
 		if timer < 0.4: drive_cmd.publish(d)
 		rate.sleep()
 

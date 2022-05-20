@@ -160,6 +160,7 @@ include_directories(
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
   scripts/p3at_drive.py scripts/p3at_keyboard.py scripts/p3at_navigation.py scripts/p3at_input.py scripts/p3at_display.py
+  scripts/p3at_sonar.py scripts/p3at_gps.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 

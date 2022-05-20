@@ -4,4 +4,6 @@
   <node name="p3at_navigation" pkg="pioneer3at" type="p3at_navigation.py" />
   <node name="p3at_display" pkg="pioneer3at" type="p3at_display.py" output="screen"/>
   <node name="p3at_drive" pkg="pioneer3at" type="p3at_drive.py" />
+  <node name="p3at_sonar" pkg="pioneer3at" type="p3at_sonar.py" />
+  <node name="p3at_gps" pkg="pioneer3at" type="p3at_gps.py" />
 </launch>
