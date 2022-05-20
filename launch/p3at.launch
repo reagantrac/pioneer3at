@@ -1,0 +1,6 @@
+<launch>
+  <node name="p3at_keyboard" pkg="pioneer3at" type="p3at_keyboard.py" />
+  <node name="p3at_input" pkg="pioneer3at" type="p3at_input.py" />
+  <node name="p3at_navigation" pkg="pioneer3at" type="p3at_navigation.py" />
+  <node name="p3at_drive" pkg="pioneer3at" type="p3at_drive.py" />
+</launch>
