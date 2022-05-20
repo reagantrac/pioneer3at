@@ -159,7 +159,7 @@ include_directories(
 ## Mark executable scripts (Python etc.) for installation
 ## in contrast to setup.py, you can choose the destination
 catkin_install_python(PROGRAMS
-  scripts/talker.py scripts/listener.py scripts/basic_p3at_listener.py scripts/drive_test.py scripts/p3at_operator.py
+  scripts/p3at_drive.py scripts/p3at_keyboard.py scripts/p3at_navigation.py scripts/p3at_input.py
   DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
 )
 
