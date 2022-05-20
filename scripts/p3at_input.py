@@ -19,8 +19,11 @@ def keypress(data):
 	m.publish(v)
 	
 	if data.data == " ":
-		s = rospy.Publisher("/p3at/switch_mode", Vector3, queue_size=1)
+		s = rospy.Publisher("/p3at/switch_mode", Bool, queue_size=1)
 		s.publish(True)
+	
+	s = rospy.Publisher("/p3at/ui_cmd", String, queue_size=1)
+	s.publish(data.data)
 
 def input():
 
