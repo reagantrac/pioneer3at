@@ -6,7 +6,7 @@ from geometry_msgs.msg import Vector3
 from evdev import list_devices, InputDevice, categorize, ecodes
 
 stick_min = 10000
-stick_max = 52000
+stick_max = 53000
 
 drive_vec = Vector3()
 key_pressed = ""
@@ -30,13 +30,15 @@ def read_controller(dev):
 			if event.code == 0:
 				y = event.value - (stick_max)/2 - stick_min
 				y /= stick_max
-				drive_vec.y = round(-y*4)/4
+				drive_vec.y = round(-y,1)
 				key_pressed = "k"
 			if event.code == 1:
 				x = event.value - (stick_max)/2 - stick_min
 				x /= stick_max
-				drive_vec.x = round(-x*4)/4
+				drive_vec.x = round(-x,1)
 		key_pressed = "k"
+		alive = rospy.Publisher("/p3at/keep_alive", Bool, queue_size=1)
+		alive.publish(True)
 
 def keypress(data):
 	global key_pressed, drive_vec
@@ -73,7 +75,7 @@ def read_input(dev):
 			continue
 			
 		
-		alive.publish(True)
+		#alive.publish(True)
 		ui.publish(key_pressed)
 		cmd.publish(drive_vec)
 		if key_pressed == " ":
