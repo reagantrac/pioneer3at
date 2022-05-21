@@ -11,7 +11,10 @@ def keypress(stdscr):
 	
 	rate = rospy.Rate(10)
 	while not rospy.is_shutdown():
+		curses.flushinp()
+		stdscr.clear()
 		keypress = stdscr.getch()
+		stdscr.refresh()
 		key.publish(curses.unctrl(keypress).decode('ascii'))
 		rate.sleep()
 

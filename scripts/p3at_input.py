@@ -3,6 +3,22 @@
 import rospy
 from std_msgs.msg import Bool, String
 from geometry_msgs.msg import Vector3
+from evdev import list_devices, InputDevice, categorize, ecodes
+
+stick_min = 10000
+stick_max = 53000
+
+def read_controller(dev):
+	event = read_one()
+	if event == None: return
+	# button
+	if event.type == ecodes.EV_KEY:
+		print("button", event.code, event.value)
+
+	#read stick axis movement
+	elif event.type == ecodes.EV_ABS:
+		
+		print("stick", event.code, event.value)
 
 def keypress(data):
 	p = rospy.Publisher("/p3at/keep_alive", Bool, queue_size=1)
@@ -25,16 +41,17 @@ def keypress(data):
 	s = rospy.Publisher("/p3at/ui_cmd", String, queue_size=1)
 	s.publish(data.data)
 
-def input():
-
+def read_input(dev):
 	rospy.Subscriber('/p3at/key_input', String, keypress)
 	rospy.init_node("p3at_input")
+	
 	
 	rospy.spin()
 
 
 if __name__ == "__main__":
+	dev = InputDevice( list_devices()[0] )
 	try:
-		input()
+		read_input(dev)
 	except rospy.ROSInterruptExeception:
 		pass

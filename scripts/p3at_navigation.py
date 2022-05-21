@@ -90,12 +90,13 @@ def navigation():
 	
 	rate = rospy.Rate(10) # 10hz
 	while not rospy.is_shutdown():
-		timer+=0.1
+		
 		
 		d = Vector3()
 		d.x = linear
 		d.y = angular
-		if timer < 0.4: drive_cmd.publish(d)
+		if timer == 0: drive_cmd.publish(d)
+		timer+=0.1
 		rate.sleep()
 
 

@@ -24,7 +24,7 @@ def drive():
 	rate = rospy.Rate(10)
 	while not rospy.is_shutdown():
 		timer += 0.1
-		if timer > 0.3:
+		if timer > 0.2:
 			linear = 0
 			angular = 0
 		vel = Twist(Vector3(linear, 0, 0), Vector3(0, 0, angular))
