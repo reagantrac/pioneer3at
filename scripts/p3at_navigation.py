@@ -87,7 +87,8 @@ def gps_point(current):
 	# drive 5 seconds straight, needs calibration
 	start_time = time.time()
 	while time.time() - start_time < 5:
-		drive_cmd.publish(Vector3(0.5, 0, 0))
+		if not executing_waypoint: break
+		drive_cmd.publish(Vector3(0.5, 0, 0))	
 
 	_, current_bearing, sx, sy = gps_distance(start, current)
 	current_xy = Vector3(sx, sy, 0)
@@ -98,8 +99,11 @@ def gps_point(current):
 	#rotate to face goal, needs calibration
 	ang = target_bearing - current_bearing
 	start_time = time.time()
-	while time.time() - start_time < 5:
-		drive_cmd.publish(Vector3(0, ang/(2*math.pi), 0))
+	while time.time() - start_time < abs(math.degrees(ang) * 0.8):
+		if not executing_waypoint: break
+		if ang < 0: turn = Vector3(0, -0.5, 0)
+		else: turn = Vector3(0, 0.5, 0)
+		drive_cmd.publish(turn)
 	
 	is_moving = False
 
