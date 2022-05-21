@@ -12,22 +12,24 @@ drive_vec = Vector3()
 command = ""
 alive = False
 
+last_pressed = 0
+
 def read_controller(dev):
-	global command, drive_vec
+	global command, drive_vec, last_pressed
 
-	
-	while dev.read_one() != None: 
-		event = dev.read_one()
-		if event == None:
-			return
-		# button
+	event = dev.read_one()
+	while event != None: 
+		if event == None: return
 		if event.type == ecodes.EV_KEY:
-			#if event.code == 310: drive_vec = Vector3()
-			
-			alive = rospy.Publisher("/p3at/keep_alive", Bool, queue_size=1)
-			alive.publish(True)
-			pass
-
+			if event.code != 0: last_pressed = event.code
+			if last_pressed == 311:
+				alive = rospy.Publisher("/p3at/keep_alive", Bool, queue_size=1)
+				alive.publish(True)
+			elif last_pressed == 999: command = "ui_waypoint_switch"
+			elif last_pressed == 999: command = "ui_waypoint_add_remove"
+			elif last_pressed == 999: command = "ui_waypoint_loop_toggle"
+			elif last_pressed == 999: command = "ui_waypoint_execute"
+			elif last_pressed == 999: command = "ui_waypoint_cancel"
 		#read stick axis movement
 		elif event.type == ecodes.EV_ABS:
 			if event.code == 0:
@@ -39,7 +41,7 @@ def read_controller(dev):
 				x = event.value - (stick_max)/2 - stick_min
 				x /= stick_max
 				drive_vec.x = round(-x,1)/2
-		#key_pressed = str(event.code)
+		event = dev.read_one()
 		
 
 def keypress(data):
@@ -56,21 +58,16 @@ def keypress(data):
 	# flag: keyboard and controller events are different
 	drive_vec.z = 1 
 	
-	if data.data == "q":
-		command = "ui_waypoint_switch"
-	elif data.data == "e":
-		command = "ui_waypoint_add_remove"
-	elif data.data == "c":
-		command = "ui_waypoint_loop_toggle"
-	elif data.data == "x":
-		command = "ui_waypoint_execute"
-	elif data.data == "z":
-		command = "ui_waypoint_cancel"
+	if data.data == "q":   command = "ui_waypoint_switch"
+	elif data.data == "e": command = "ui_waypoint_add_remove"
+	elif data.data == "c": command = "ui_waypoint_loop_toggle"
+	elif data.data == "x": command = "ui_waypoint_execute"
+	elif data.data == "z": command = "ui_waypoint_cancel"
 
 def read_input(dev):
 	global command, drive_vec
 
-	ui = rospy.Publisher("/p3at/ui_cmd", String, queue_size=1)
+	ui = rospy.Publisher("/p3at/ui_cmd", String, queue_size=3)
 	cmd = rospy.Publisher("/p3at/manual_cmd", Vector3, queue_size=1)
 	mode = rospy.Publisher("/p3at/switch_mode", Bool, queue_size=1)
 	alive = rospy.Publisher("/p3at/keep_alive", Bool, queue_size=1)
@@ -78,6 +75,8 @@ def read_input(dev):
 	rospy.Subscriber('/p3at/key_input', String, keypress)
 	rospy.init_node("p3at_input")
 	
+	alive.publish(True) # wake up the robot, one time
+
 	rate = rospy.Rate(10)
 	while not rospy.is_shutdown():
 		if dev: read_controller(dev)

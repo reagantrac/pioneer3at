@@ -127,12 +127,12 @@ def ui_cmd(data):
 			waypoints_loop = not waypoints_loop
 		elif command == "ui_waypoint_execute":
 			executing_waypoint = True
-	elif command == "ui_waypoint_cancel":
-		stop()
+	elif command == "ui_waypoint_cancel": stop()
 	
 	display = rospy.Publisher("/p3at/display/text", String, queue_size=20)
 	display.publish("0_.WAYPOINT SELECTOR :: :Add/Remove, :: ")
 	display.publish("1_.Will Loop = "+str(waypoints_loop))
+	display.publish("9_.Press A to start navigation / Press B to return to manual driving")
 	for key in waypoints:
 		idx = list(waypoints.keys()).index(key)
 		selected = False
@@ -161,6 +161,10 @@ def navigation():
 	rospy.Subscriber("/p3at/ui_cmd", String, ui_cmd)
 	rospy.Subscriber("/p3at/manual_cmd", Vector3, manual_drive)
 	rospy.Subscriber("/p3at/gps", Vector3, gps_point)
+	
+	ui_cmd(String(""))
+	ui_cmd(String(""))
+	ui_cmd(String(""))
 	
 	rate = rospy.Rate(10) # 10hz
 	while not rospy.is_shutdown():
