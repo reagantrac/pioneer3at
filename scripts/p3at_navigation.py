@@ -20,16 +20,22 @@ timer = 0
 linear = 0
 angular = 0
 automatic = False
-position = [0.0,0.0]
+positions = [0.0,0.0]
+
+drive_dist = 0
+target_dist = -1
 
 selected_waypoint = 0
 executing_waypoint = False
+start = Vector3()
+current_xy = Vector3()
+goal_xy = Vector3()
 	
 def gps_distance(point1, point2):
-	lat1 = math.radians(point1["latitude"])
-	lon1 = math.radians(point1["longitude"])
-	lat2 = math.radians(point2["latitude"])
-	lon2 = math.radians(point2["longitude"])
+	lat1 = math.radians(point1.y)
+	lon1 = math.radians(point1.x)
+	lat2 = math.radians(point2.y)
+	lon2 = math.radians(point2.x)
 	dlat = (lat2-lat1)
 	dlon = (lon2-lon1)
 	a = math.sin(dlat/2)**2  + math.cos(lat1) * math.cos(lat2) * math.sin(dlon/2)**2
@@ -40,6 +46,41 @@ def gps_distance(point1, point2):
 	x = math.cos(lat1)*math.sin(lat2) - math.sin(lat1)*math.cos(lat2)*math.cos(dlon)
 	ang = math.atan2(y, x)
 	return dist, ang, -dist*math.cos(ang), dist*math.sin(ang)
+
+def gps_point(current):
+	global linear, angular, drive_dist, target_dist, current_xy, goal_xy, start, automatic
+	if not automatic: return
+	
+	if drive_dist < target_dist:
+		# keep driving forward
+		
+		linear = 0.5
+
+	name = list(waypoints.keys())[selected_waypoint]
+	goal = Vector3()
+	goal.x = waypoints[name]["longitude"]
+	goal.y = waypoints[name]["latitude"]
+
+	if start.x == 0 and start.y == 0:
+		start.x = current.x
+		start.y = current.y
+		gd, ga, gx, gy = gps_distance(current, goal)
+		target_dist = gd/20
+		
+	
+	
+	sd, sa, sx, sy = gps_distance(start, current)
+	current_xy.x = sx
+	current_xy.y = sy
+	gd, ga, gx, gy = gps_distance(current, goal)
+	goal_xy.x = gx
+	goal_xy.y = gy
+	
+	
+	#rotate to face goal
+	ang = math.atan2(goal_xy.y-current_xy.y, goal_xy.x-current_xy.x)
+	angular = ang
+		
 
 def is_alive(data):
 	global timer
@@ -75,7 +116,7 @@ def drive_mode(data):
 	automatic = not automatic
 
 def navigation():
-	global timer, linear, angular
+	global timer, linear, angular, drive_dist
 
 	drive_cmd = rospy.Publisher("/p3at/drive_cmd", Vector3, queue_size=1)
 	
@@ -88,6 +129,8 @@ def navigation():
 	rospy.Subscriber("/p3at/manual_cmd", Vector3, manual_cmd)
 	rospy.Subscriber("/p3at/switch_mode", Bool, drive_mode)
 	
+	rospy.Subscriber("/p3at/gps", Vector3, gps_point)
+	
 	rate = rospy.Rate(10) # 10hz
 	while not rospy.is_shutdown():
 		
@@ -95,7 +138,9 @@ def navigation():
 		d = Vector3()
 		d.x = linear
 		d.y = angular
-		if timer == 0: drive_cmd.publish(d)
+		if timer == 0: 
+			drive_cmd.publish(d)
+			drive_dist += 1
 		timer+=0.1
 		rate.sleep()
 

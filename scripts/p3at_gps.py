@@ -2,9 +2,18 @@
 
 import rospy
 from geometry_msgs.msg import Vector3
+from serial import Serial #pyserial
 
 def get_gps_point():
-	return (115.8171314540043, -31.98082891705035)
+	ser = Serial("/dev/ttyACM0", 9600)
+	while True:
+		data = ser.readline().decode('utf-8')
+		if data.split(",")[0] != "$GNGLL": continue
+		gps = data.split(",")[1:]
+		lat = -float(gps[0])/100
+		lon = float(gps[2])/100
+
+		return (lon, lat)
 
 def read_gps():
 

@@ -22,7 +22,10 @@ def read_controller(dev):
 			return
 		# button
 		if event.type == ecodes.EV_KEY:
+			#if event.code == 310: drive_vec = Vector3()
 			
+			alive = rospy.Publisher("/p3at/keep_alive", Bool, queue_size=1)
+			alive.publish(True)
 			print("button", event.code, event.value)
 
 		#read stick axis movement
@@ -30,15 +33,14 @@ def read_controller(dev):
 			if event.code == 0:
 				y = event.value - (stick_max)/2 - stick_min
 				y /= stick_max
-				drive_vec.y = round(-y,1)
+				drive_vec.y = round(-y,1)/2
 				key_pressed = "k"
 			if event.code == 1:
 				x = event.value - (stick_max)/2 - stick_min
 				x /= stick_max
-				drive_vec.x = round(-x,1)
-		key_pressed = "k"
-		alive = rospy.Publisher("/p3at/keep_alive", Bool, queue_size=1)
-		alive.publish(True)
+				drive_vec.x = round(-x,1)/2
+		key_pressed = str(event.code)
+		
 
 def keypress(data):
 	global key_pressed, drive_vec
@@ -78,7 +80,7 @@ def read_input(dev):
 		#alive.publish(True)
 		ui.publish(key_pressed)
 		cmd.publish(drive_vec)
-		if key_pressed == " ":
+		if key_pressed == " " or key_pressed == 310:
 			mode.publish(True)
 			
 		key_pressed = ""
