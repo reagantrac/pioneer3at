@@ -5,7 +5,10 @@ from geometry_msgs.msg import Vector3
 from serial import Serial #pyserial
 
 def get_gps_point():
-	ser = Serial("/dev/ttyACM0", 9600)
+	try:
+		ser = Serial("/dev/ttyACM0", 9600)
+	except:
+		return (115.8171660979887, -31.98057735055060)
 	while True:
 		data = ser.readline().decode('utf-8')
 		if data.split(",")[0] != "$GNGLL": continue

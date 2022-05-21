@@ -1,9 +1,9 @@
 <launch>
   <!-- <node name="p3at_keyboard" pkg="pioneer3at" type="p3at_keyboard.py" /> -->
+  <!-- <node name="RosAria" pkg="rosaria" type="RosAria" /> -->
   <node name="p3at_input" pkg="pioneer3at" type="p3at_input.py" />
   <node name="p3at_navigation" pkg="pioneer3at" type="p3at_navigation.py" />
   <node name="p3at_display" pkg="pioneer3at" type="p3at_display.py" output="screen"/>
   <node name="p3at_drive" pkg="pioneer3at" type="p3at_drive.py" />
-  <node name="p3at_sonar" pkg="pioneer3at" type="p3at_sonar.py" />
   <node name="p3at_gps" pkg="pioneer3at" type="p3at_gps.py" />
 </launch>

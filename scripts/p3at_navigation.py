@@ -4,7 +4,7 @@ import rospy
 
 from std_msgs.msg import Bool, String
 from geometry_msgs.msg import Vector3
-import math
+import math, time
 
 waypoints = {
 	"somewhere_along_the_way": 		{"longitude": 115.8171782781675, "latitude": -31.98038731577529},
@@ -16,21 +16,26 @@ waypoints = {
 	"coffee_time": 					{"longitude": 115.8197862220968, "latitude": -31.98052211397503},
 }
 
-timer = 0
-linear = 0
-angular = 0
-automatic = False
-positions = [0.0,0.0]
+is_moving = False
 
-drive_dist = 0
-target_dist = -1
-
+# waypoint variables
 selected_waypoint = 0
 executing_waypoint = False
+waypoints_list = []
+waypoints_loop = False
+waypoints_progress = 0
+
+# gps navigation variables
 start = Vector3()
 current_xy = Vector3()
 goal_xy = Vector3()
-	
+
+def stop():
+	global executing_waypoint, waypoints_progress, is_moving
+	executing_waypoint = False
+	waypoints_progress = 0
+	is_moving = False
+
 def gps_distance(point1, point2):
 	lat1 = math.radians(point1.y)
 	lon1 = math.radians(point1.x)
@@ -48,100 +53,113 @@ def gps_distance(point1, point2):
 	return dist, ang, -dist*math.cos(ang), dist*math.sin(ang)
 
 def gps_point(current):
-	global linear, angular, drive_dist, target_dist, current_xy, goal_xy, start, automatic
-	if not automatic: return
+	global current_xy, goal_xy, start, is_moving
+	global executing_waypoint, waypoints_progress, waypoints_list, selected_waypoint, waypoints_loop
+	if is_moving: return
+	if not executing_waypoint: return
 	
-	if drive_dist < target_dist:
-		# keep driving forward
-		
-		linear = 0.5
-
-	name = list(waypoints.keys())[selected_waypoint]
-	goal = Vector3()
-	goal.x = waypoints[name]["longitude"]
-	goal.y = waypoints[name]["latitude"]
-
+	is_moving = True
+	drive_cmd = rospy.Publisher("/p3at/drive_cmd", Vector3, queue_size=1)
+	
+	# record gps at start of route
 	if start.x == 0 and start.y == 0:
 		start.x = current.x
 		start.y = current.y
-		gd, ga, gx, gy = gps_distance(current, goal)
-		target_dist = gd/20
+	
+	# get goal
+	idx = waypoints_list[waypoints_progress]
+	name = list(waypoints.keys())[idx]
+	goal = Vector3(waypoints[name]["longitude"], waypoints[name]["latitude"], 0)
+	
+	# check if at goal
+	check_dist, _, _, _ = gps_distance(current, goal)
+	rospy.loginfo(check_dist)
+	if int(check_dist) < 5:
+		rospy.loginfo(str(check_dist) + " reached goal")
+		waypoints_progress += 1
+		if waypoints_loop: waypoints_progress = waypoints_progress % len(waypoints_list)
+		elif waypoints_progress >= len(waypoints_list): 
+			stop()
+			ui_cmd(String(""))
+			return
+		ui_cmd(String(""))
+	
+	# drive 5 seconds straight, needs calibration
+	start_time = time.time()
+	while time.time() - start_time < 5:
+		drive_cmd.publish(Vector3(0.5, 0, 0))
+
+	_, current_bearing, sx, sy = gps_distance(start, current)
+	current_xy = Vector3(sx, sy, 0)
+	
+	_, target_bearing, gx, gy = gps_distance(current, goal)
+	goal_xy = Vector3(gx, gy, 0)
 		
+	#rotate to face goal, needs calibration
+	ang = target_bearing - current_bearing
+	start_time = time.time()
+	while time.time() - start_time < 5:
+		drive_cmd.publish(Vector3(0, ang/(2*math.pi), 0))
 	
-	
-	sd, sa, sx, sy = gps_distance(start, current)
-	current_xy.x = sx
-	current_xy.y = sy
-	gd, ga, gx, gy = gps_distance(current, goal)
-	goal_xy.x = gx
-	goal_xy.y = gy
-	
-	
-	#rotate to face goal
-	ang = math.atan2(goal_xy.y-current_xy.y, goal_xy.x-current_xy.x)
-	angular = ang
-		
+	is_moving = False
 
 def is_alive(data):
 	global timer
 	timer = 0
 
 def ui_cmd(data):
-	global selected_waypoint, executing_waypoint
-	if data.data == "q": selected_waypoint -= 1
-	elif data.data == "e": selected_waypoint += 1
-	elif data.data == "^J": executing_waypoint = True
-	else: return
-	selected_waypoint = selected_waypoint % len(waypoints)
+	global selected_waypoint, executing_waypoint, waypoints_list, waypoints_loop, waypoints_progress
+	command = data.data
 	
-	string = ""
+	if not executing_waypoint:
+		if command == "ui_waypoint_switch": 
+			selected_waypoint += 1
+			selected_waypoint = selected_waypoint % len(waypoints)
+		elif command == "ui_waypoint_add_remove":
+			if selected_waypoint in waypoints_list:
+				waypoints_list.remove(selected_waypoint)
+			else: waypoints_list.append(selected_waypoint)
+		elif command == "ui_waypoint_loop_toggle":
+			waypoints_loop = not waypoints_loop
+		elif command == "ui_waypoint_execute":
+			executing_waypoint = True
+	elif command == "ui_waypoint_cancel":
+		stop()
+	
+	display = rospy.Publisher("/p3at/display/text", String, queue_size=20)
+	display.publish("0_.WAYPOINT SELECTOR :: :Add/Remove, :: ")
+	display.publish("1_.Will Loop = "+str(waypoints_loop))
 	for key in waypoints:
-		selected = list(waypoints.keys()).index(key) == selected_waypoint
-		if selected and executing_waypoint: string += "r."
-		elif selected: string += "s."
-		else: string += "_."
-		string += key + "\n"
-	
-	display = rospy.Publisher("/p3at/display/text", String, queue_size=1)
-	display.publish(string)
+		idx = list(waypoints.keys()).index(key)
+		selected = False
+		if executing_waypoint: selected = (idx == waypoints_list[waypoints_progress])
+		else: selected = (idx == selected_waypoint)
+		
+		prefix = str(idx+2) + "_.[ ] "
+		prefix = list(prefix)
+		if idx in waypoints_list: 
+			prefix[4] = str(waypoints_list.index(idx))
+		if selected and executing_waypoint: prefix[1] = "r"
+		elif selected: prefix[1] = "s"
+		
+		display.publish("".join(prefix) + key)
 
-def manual_cmd(data):
-	global linear, angular, automatic
-	if not automatic:
-		linear = data.x
-		angular = data.y
-
-def drive_mode(data):
-	global automatic
-	automatic = not automatic
+def manual_drive(data):
+	global executing_waypoint
+	if not executing_waypoint:
+		drive_cmd = rospy.Publisher("/p3at/drive_cmd", Vector3, queue_size=1)
+		drive_cmd.publish(Vector3(data.x, data.y, 0))
 
 def navigation():
-	global timer, linear, angular, drive_dist
-
-	drive_cmd = rospy.Publisher("/p3at/drive_cmd", Vector3, queue_size=1)
-	
-	#print(gps_distance(waypoints["maybe_a_scoreboard"], waypoints["somewhere_along_the_way"]))
-
 	rospy.init_node("p3at_navigation")
 	
 	rospy.Subscriber("/p3at/keep_alive", Bool, is_alive)
 	rospy.Subscriber("/p3at/ui_cmd", String, ui_cmd)
-	rospy.Subscriber("/p3at/manual_cmd", Vector3, manual_cmd)
-	rospy.Subscriber("/p3at/switch_mode", Bool, drive_mode)
-	
+	rospy.Subscriber("/p3at/manual_cmd", Vector3, manual_drive)
 	rospy.Subscriber("/p3at/gps", Vector3, gps_point)
 	
 	rate = rospy.Rate(10) # 10hz
 	while not rospy.is_shutdown():
-		
-		
-		d = Vector3()
-		d.x = linear
-		d.y = angular
-		if timer == 0: 
-			drive_cmd.publish(d)
-			drive_dist += 1
-		timer+=0.1
 		rate.sleep()
 
 

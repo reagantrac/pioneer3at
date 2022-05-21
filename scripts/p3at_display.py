@@ -8,17 +8,25 @@ stdscr = None
 def ui_map(data):
 	pass
 
-def ui_text(data):
+def ui_text(line):
 	global stdscr
-	stdscr.erase()
-	for i, line in enumerate(data.data.split("\n")):
-		if line.split(".")[0] == "r": 
-			stdscr.addstr(i, 0, line[2:], curses.A_BOLD)
-			stdscr.addstr(i, 30, "[ running... ]", curses.A_BLINK)
-		elif line.split(".")[0] == "s":
-			stdscr.addstr(i, 0, line[2:], curses.A_BOLD)
-			stdscr.addstr(i, 30, "[ENTER to run]", curses.A_BOLD)
-		else: stdscr.addstr(i, 0, line[2:])	
+	
+	line_num = int(line.data[0])
+	line_mode = line.data[1]
+	
+	stdscr.move(line_num, 0)
+	stdscr.clrtoeol()
+	stdscr.move(0, 0)
+	
+	if line_mode == "_":
+		stdscr.addstr(line_num, 0, line.data[3:])
+	elif line_mode == "r":
+		stdscr.addstr(line_num, 0, line.data[3:], curses.A_BOLD)
+		stdscr.addstr(line_num, 40, "[ running... ]", curses.A_BLINK)
+	elif line_mode == "s":
+		stdscr.addstr(line_num, 0, line.data[3:], curses.A_BOLD)
+		stdscr.addstr(line_num, 40, "[  A to run  ]", curses.A_BOLD)
+
 	stdscr.refresh()
 
 def display(screen):
