@@ -18,6 +18,7 @@ waypoints = {
 
 is_moving = False
 is_alive = False
+alive_timer = 0
 
 # waypoint variables
 selected_waypoint = 0
@@ -32,10 +33,11 @@ current_xy = Vector3()
 goal_xy = Vector3()
 
 def stop():
-	global executing_waypoint, waypoints_progress, is_moving
+	global executing_waypoint, waypoints_progress, is_moving, start
 	executing_waypoint = False
 	waypoints_progress = 0
 	is_moving = False
+	start = Vector3()
 
 def gps_distance(point1, point2):
 	lat1 = math.radians(point1.y)
@@ -66,6 +68,11 @@ def gps_point(current):
 	if start.x == 0 and start.y == 0:
 		start.x = current.x
 		start.y = current.y
+	
+	if len(waypoints_list) == 0:
+		stop()
+		ui_cmd(String(""))
+		return
 	
 	# get goal
 	idx = waypoints_list[waypoints_progress]
@@ -100,7 +107,7 @@ def gps_point(current):
 	#rotate to face goal, needs calibration
 	ang = target_bearing - current_bearing
 	start_time = time.time()
-	while time.time() - start_time < abs(math.degrees(ang) * 0.8):
+	while time.time() - start_time < abs(math.degrees(ang) / 20):
 		if not executing_waypoint or not is_alive: break
 		if ang < 0: turn = Vector3(0, -0.5, 0)
 		else: turn = Vector3(0, 0.5, 0)
@@ -109,8 +116,9 @@ def gps_point(current):
 	is_moving = False
 
 def is_alive(data):
-	global is_alive
+	global is_alive, alive_timer
 	is_alive = True
+	alive_timer = 0
 
 def ui_cmd(data):
 	global selected_waypoint, executing_waypoint, waypoints_list, waypoints_loop, waypoints_progress
@@ -131,8 +139,8 @@ def ui_cmd(data):
 	elif command == "ui_waypoint_cancel": stop()
 	
 	display = rospy.Publisher("/p3at/display/text", String, queue_size=20)
-	display.publish("0_.WAYPOINT SELECTOR :: :Add/Remove, :: ")
-	display.publish("1_.Will Loop = "+str(waypoints_loop))
+	display.publish("0_.WAYPOINT SELECTOR :: Right Bumper to switch option")
+	display.publish("1_.Y :: Loop waypoints = "+str(waypoints_loop))
 	display.publish("9_.Press A to start navigation / Press B to return to manual driving")
 	for key in waypoints:
 		idx = list(waypoints.keys()).index(key)
@@ -156,7 +164,7 @@ def manual_drive(data):
 		drive_cmd.publish(Vector3(data.x, data.y, 0))
 
 def navigation():
-	global is_alive
+	global is_alive, alive_timer
 
 	rospy.init_node("p3at_navigation")
 	
@@ -171,7 +179,8 @@ def navigation():
 	
 	rate = rospy.Rate(10) # 10hz
 	while not rospy.is_shutdown():
-		is_alive = False
+		alive_timer += 0.1
+		if alive_timer > 0.3: is_alive = False
 		rate.sleep()
 
 

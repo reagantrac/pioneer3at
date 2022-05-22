@@ -10,14 +10,14 @@ def get_gps_point():
 	except:
 		return (115.8171660979887, -31.98057735055060)
 	while True:
-		data = ser.readline().decode('utf-8')
+		data = ser.readline().decode('ISO-8859-1')
 		if data.split(",")[0] != "$GNGLL": continue
 		gps = data.split(",")[1:]
 		if gps[0] == "" or gps[2] == "": return (115.8171660979887, -31.98057735055060)
 		
 		lat = -float(gps[0])/100
 		lon = float(gps[2])/100
-
+  
 		return (lon, lat)
 
 def read_gps():

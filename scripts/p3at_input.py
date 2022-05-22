@@ -31,12 +31,12 @@ def read_controller(dev):
 			elif code not in button_pressed: button_pressed.append(code)
 		#read stick axis movement
 		elif event.type == ecodes.EV_ABS:
-			if event.code == 0:
+			if event.code == 3:
 				y = event.value - (stick_max)/2 - stick_min
 				y /= stick_max
 				drive_vec.y = round(-y,1)
 				key_pressed = "k"
-			if event.code == 1:
+			if event.code == 4:
 				x = event.value - (stick_max)/2 - stick_min
 				x /= stick_max
 				drive_vec.x = round(-x,1)

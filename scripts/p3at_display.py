@@ -25,6 +25,7 @@ def ui_text(line):
 		stdscr.addstr(line_num, 40, "[ running... ]", curses.A_BLINK)
 	elif line_mode == "s":
 		stdscr.addstr(line_num, 0, line.data[3:], curses.A_BOLD)
+		stdscr.addstr(line_num, 40, "[  X to add  ]", curses.A_BOLD)
 
 	stdscr.refresh()
 
