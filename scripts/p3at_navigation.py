@@ -17,6 +17,7 @@ waypoints = {
 }
 
 is_moving = False
+is_alive = False
 
 # waypoint variables
 selected_waypoint = 0
@@ -53,7 +54,7 @@ def gps_distance(point1, point2):
 	return dist, ang, -dist*math.cos(ang), dist*math.sin(ang)
 
 def gps_point(current):
-	global current_xy, goal_xy, start, is_moving
+	global current_xy, goal_xy, start, is_moving, is_alive
 	global executing_waypoint, waypoints_progress, waypoints_list, selected_waypoint, waypoints_loop
 	if is_moving: return
 	if not executing_waypoint: return
@@ -87,7 +88,7 @@ def gps_point(current):
 	# drive 5 seconds straight, needs calibration
 	start_time = time.time()
 	while time.time() - start_time < 5:
-		if not executing_waypoint: break
+		if not executing_waypoint or not is_alive: break
 		drive_cmd.publish(Vector3(0.5, 0, 0))	
 
 	_, current_bearing, sx, sy = gps_distance(start, current)
@@ -100,7 +101,7 @@ def gps_point(current):
 	ang = target_bearing - current_bearing
 	start_time = time.time()
 	while time.time() - start_time < abs(math.degrees(ang) * 0.8):
-		if not executing_waypoint: break
+		if not executing_waypoint or not is_alive: break
 		if ang < 0: turn = Vector3(0, -0.5, 0)
 		else: turn = Vector3(0, 0.5, 0)
 		drive_cmd.publish(turn)
@@ -108,8 +109,8 @@ def gps_point(current):
 	is_moving = False
 
 def is_alive(data):
-	global timer
-	timer = 0
+	global is_alive
+	is_alive = True
 
 def ui_cmd(data):
 	global selected_waypoint, executing_waypoint, waypoints_list, waypoints_loop, waypoints_progress
@@ -149,12 +150,14 @@ def ui_cmd(data):
 		display.publish("".join(prefix) + key)
 
 def manual_drive(data):
-	global executing_waypoint
-	if not executing_waypoint:
+	global executing_waypoint, is_alive
+	if not executing_waypoint and is_alive:
 		drive_cmd = rospy.Publisher("/p3at/drive_cmd", Vector3, queue_size=1)
 		drive_cmd.publish(Vector3(data.x, data.y, 0))
 
 def navigation():
+	global is_alive
+
 	rospy.init_node("p3at_navigation")
 	
 	rospy.Subscriber("/p3at/keep_alive", Bool, is_alive)
@@ -168,6 +171,7 @@ def navigation():
 	
 	rate = rospy.Rate(10) # 10hz
 	while not rospy.is_shutdown():
+		is_alive = False
 		rate.sleep()
 
 

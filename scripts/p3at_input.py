@@ -5,42 +5,41 @@ from std_msgs.msg import Bool, String
 from geometry_msgs.msg import Vector3
 from evdev import list_devices, InputDevice, categorize, ecodes
 
-stick_min = 10000
-stick_max = 53000
-
 drive_vec = Vector3()
 command = ""
 alive = False
 
-last_pressed = 0
+button_pressed = []
 
 def read_controller(dev):
-	global command, drive_vec, last_pressed
+	global command, drive_vec, button_pressed
+	stick_min = 10000
+	stick_max = 53000
 
 	event = dev.read_one()
 	while event != None: 
-		if event == None: return
 		if event.type == ecodes.EV_KEY:
-			if event.code != 0: last_pressed = event.code
-			if last_pressed == 311:
-				alive = rospy.Publisher("/p3at/keep_alive", Bool, queue_size=1)
-				alive.publish(True)
-			elif last_pressed == 999: command = "ui_waypoint_switch"
-			elif last_pressed == 999: command = "ui_waypoint_add_remove"
-			elif last_pressed == 999: command = "ui_waypoint_loop_toggle"
-			elif last_pressed == 999: command = "ui_waypoint_execute"
-			elif last_pressed == 999: command = "ui_waypoint_cancel"
+			code = event.code
+			if   code == 309 and code not in button_pressed: command = "ui_waypoint_switch"
+			elif code == 307 and code not in button_pressed: command = "ui_waypoint_add_remove"
+			elif code == 306 and code not in button_pressed: command = "ui_waypoint_loop_toggle"
+			elif code == 305 and code not in button_pressed: command = "ui_waypoint_execute"
+			elif code == 304 and code not in button_pressed: command = "ui_waypoint_cancel"
+			
+			if event.value == 0:
+				if code in button_pressed: button_pressed.remove(code)
+			elif code not in button_pressed: button_pressed.append(code)
 		#read stick axis movement
 		elif event.type == ecodes.EV_ABS:
 			if event.code == 0:
 				y = event.value - (stick_max)/2 - stick_min
 				y /= stick_max
-				drive_vec.y = round(-y,1)/2
+				drive_vec.y = round(-y,1)
 				key_pressed = "k"
 			if event.code == 1:
 				x = event.value - (stick_max)/2 - stick_min
 				x /= stick_max
-				drive_vec.x = round(-x,1)/2
+				drive_vec.x = round(-x,1)
 		event = dev.read_one()
 		
 
@@ -65,7 +64,7 @@ def keypress(data):
 	elif data.data == "z": command = "ui_waypoint_cancel"
 
 def read_input(dev):
-	global command, drive_vec
+	global command, drive_vec, button_pressed
 
 	ui = rospy.Publisher("/p3at/ui_cmd", String, queue_size=3)
 	cmd = rospy.Publisher("/p3at/manual_cmd", Vector3, queue_size=1)
@@ -81,7 +80,10 @@ def read_input(dev):
 	while not rospy.is_shutdown():
 		if dev: read_controller(dev)
 		
-		if command != "" or drive_vec.x != 0 or drive_vec.y != 0: 
+		if drive_vec.z == 1 and (command != "" or drive_vec.x != 0 or drive_vec.y != 0):
+			alive.publish(True)
+			cmd.publish(drive_vec)
+		elif drive_vec.z == 0 and 311 in button_pressed:
 			alive.publish(True)
 			cmd.publish(drive_vec)
 		if command.split("_")[0] == "ui": ui.publish(command)
