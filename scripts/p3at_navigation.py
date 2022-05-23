@@ -98,7 +98,7 @@ def gps_point(current):
 	start_time = time.time()
 	while time.time() - start_time < 10:
 		if not executing_waypoint or not is_alive: break
-		drive_cmd.publish(Vector3(0.5, 0, 0))	
+		drive_cmd.publish(Vector3(0.5, 0, 0))
 
 	_, current_bearing, sx, sy = gps_distance(start, current)
 	current_xy = Vector3(sx, sy, 0)
@@ -109,8 +109,8 @@ def gps_point(current):
 	start_time = time.time()
 	while time.time() - start_time < abs(math.degrees(ang) / 30):
 		if not executing_waypoint or not is_alive: break
-		if ang < 0: turn = Vector3(0, 0.35, 0)
-		else: turn = Vector3(0, -0.35, 0)
+		if ang < 0: turn = Vector3(0, 0.3, 0)
+		else: turn = Vector3(0, -0.3, 0)
 		drive_cmd.publish(turn)
 	
 	is_moving = False
