@@ -58,6 +58,7 @@ def gps_distance(point1, point2):
 def gps_point(current):
 	global current_xy, goal_xy, start, is_moving, is_alive
 	global executing_waypoint, waypoints_progress, waypoints_list, selected_waypoint, waypoints_loop
+	current_xy = current
 	if is_moving: return
 	if not executing_waypoint: return
 	
@@ -66,11 +67,12 @@ def gps_point(current):
 	
 	# record gps at start of route
 	if start.x == 0 and start.y == 0:
-		start.x = current.x
-		start.y = current.y
+		start.x = current_xy.x
+		start.y = current_xy.y
 	
 	if len(waypoints_list) == 0:
 		stop()
+
 		ui_cmd(String(""))
 		return
 	
@@ -80,8 +82,8 @@ def gps_point(current):
 	goal = Vector3(waypoints[name]["longitude"], waypoints[name]["latitude"], 0)
 	
 	# check if at goal
-	check_dist, target_bearing, gx, gy = gps_distance(current, goal)
-	if int(check_dist) < 5:
+	check_dist, target_bearing, gx, gy = gps_distance(current_xy, goal)
+	if int(check_dist) < 2:
 		rospy.loginfo(str(check_dist) + " reached goal")
 		waypoints_progress += 1
 		if waypoints_loop: waypoints_progress = waypoints_progress % len(waypoints_list)
@@ -96,21 +98,25 @@ def gps_point(current):
 	
 	# drive 5 seconds straight, needs calibration
 	start_time = time.time()
-	while time.time() - start_time < 10:
+	while time.time() - start_time < 5:
 		if not executing_waypoint or not is_alive: break
 		drive_cmd.publish(Vector3(0.5, 0, 0))
 
-	_, current_bearing, sx, sy = gps_distance(start, current)
-	current_xy = Vector3(sx, sy, 0)
-	goal_xy = Vector3(gx, gy, 0)
+	_, current_bearing, sx, sy = gps_distance(start, current_xy)
+	#current_xy = Vector3(sx, sy, 0)
+	#goal_xy = Vector3(gx, gy, 0)
 		
 	#rotate to face goal, needs calibration
 	ang = target_bearing - current_bearing
 	start_time = time.time()
-	while time.time() - start_time < abs(math.degrees(ang) / 30):
+	dur =  abs(math.degrees(ang) % 180 / 40)
+	log = rospy.Publisher("/p3at/log_ang", Vector3, queue_size=1)
+	log.publish(Vector3(current_xy.x, current_xy.y, ang))
+	
+	while time.time() - start_time < dur:
 		if not executing_waypoint or not is_alive: break
-		if ang < 0: turn = Vector3(0, 0.3, 0)
-		else: turn = Vector3(0, -0.3, 0)
+		if ang < 0 or ang > 180: turn = Vector3(0, -0.3, 0)
+		else: turn = Vector3(0, 0.3, 0)
 		drive_cmd.publish(turn)
 	
 	is_moving = False

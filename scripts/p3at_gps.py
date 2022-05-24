@@ -1,11 +1,20 @@
 #!/usr/bin/env python
 
 import rospy
+from std_msgs.msg import String
 from geometry_msgs.msg import Vector3
 from serial import Serial #pyserial
 import numpy as np
 
-running_average = [[],[],[],[],[],[],[],[],[],[]]
+running_average = [
+	[115.8171314540043,-31.98082891705035],
+	#[115.8171314540043,-31.98082891705035],
+	#[115.8171314540043,-31.98082891705035],
+	#[115.8171314540043,-31.98082891705035],
+	#                                          [115.8171314540043,-31.98082891705035],
+]
+
+f = open("/dev/ttyACM0", "rb")
 
 def read_line(port, eol="\n"):
 	leneol = len(eol)
@@ -20,20 +29,32 @@ def add_gps_point(lon, lat):
 	running_average.append([lon, lat])
 
 def get_gps_point():
-	with open("/dev/ttyACM0", "rb") as gps:
-		g = gps.readline()
-		while len(g) >= 2:
-			data = g.decode('utf-8')
-			g = gps.readline()
-			if data.split(",")[0] != "$GNGLL": continue
-			if data.split(",")[0] == "" or data.split(",")[2] == "": continue
-			rospy.loginfo(",".join(data))
-			lat = -float(data.split(",")[0])/100
-			lon = float(data.split(",")[2])/100
-			
-			add_gps_point(lon, lat)
-			
-			return np.average(running_average[running_average != []], axis=0, weights=np.linspace(1.0,2.0,0.1))
+	global f
+	
+
+		
+	for bline in f:
+		line = bline.decode("utf-8")
+ 
+		g = line.split(",")
+		#arr = np.array(running_average)
+		if g[0] != "$GNGLL": continue
+
+		#log = rospy.Publisher("/p3at/log_gps", String, queue_size=1)
+		#log.publish(line)
+		
+		
+		if g[1] == "" or g[3] == "": continue
+		lat = -float(g[1])/100
+		lon = float(g[3])/100
+		
+		add_gps_point(lon, lat)
+		break
+		#arr = running_average[running_average != []
+	arr = np.array(running_average)
+	#f.seek(0,2)
+		
+	return np.average(arr, axis=0)
 	#np.mean(running_average[running_average != []])
 def read_gps():
 
@@ -46,6 +67,8 @@ def read_gps():
 		lon_lat = get_gps_point()
 		pos.x = lon_lat[0]
 		pos.y = lon_lat[1]
+		log = rospy.Publisher("/p3at/log_gps", Vector3, queue_size=1)
+		log.publish(pos)
 		g.publish(pos)
 		rate.sleep()
 
