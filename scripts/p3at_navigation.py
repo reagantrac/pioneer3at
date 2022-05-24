@@ -83,7 +83,7 @@ def gps_point(current):
 	
 	# check if at goal
 	check_dist, target_bearing, gx, gy = gps_distance(current_xy, goal)
-	if int(check_dist) < 2:
+	if int(check_dist) < 5:
 		rospy.loginfo(str(check_dist) + " reached goal")
 		waypoints_progress += 1
 		if waypoints_loop: waypoints_progress = waypoints_progress % len(waypoints_list)
@@ -98,7 +98,7 @@ def gps_point(current):
 	
 	# drive 5 seconds straight, needs calibration
 	start_time = time.time()
-	while time.time() - start_time < 5:
+	while time.time() - start_time < 8:
 		if not executing_waypoint or not is_alive: break
 		drive_cmd.publish(Vector3(0.5, 0, 0))
 
@@ -108,17 +108,18 @@ def gps_point(current):
 		
 	#rotate to face goal, needs calibration
 	ang = target_bearing - current_bearing
+	deg = math.degrees(ang) % 360
 	start_time = time.time()
-	dur =  abs(math.degrees(ang) % 180 / 40)
+	dur =  abs((180+deg) % 180 / 40)
 	log = rospy.Publisher("/p3at/log_ang", Vector3, queue_size=1)
-	log.publish(Vector3(current_xy.x, current_xy.y, ang))
+	log.publish(Vector3(dur, deg, ang))
 	
 	while time.time() - start_time < dur:
 		if not executing_waypoint or not is_alive: break
-		if ang < 0 or ang > 180: turn = Vector3(0, -0.3, 0)
+		if deg < 0 or deg > 180: turn = Vector3(0, -0.3, 0)
 		else: turn = Vector3(0, 0.3, 0)
 		drive_cmd.publish(turn)
-	
+	start = current_xy
 	is_moving = False
 
 def is_alive(data):
