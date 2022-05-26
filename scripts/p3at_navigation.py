@@ -226,19 +226,33 @@ def navigation():
 			drive_cmd = rospy.Publisher("/p3at/drive_cmd", Vector3, queue_size=1)
 			log = rospy.Publisher("/p3at/log_ang", Vector3, queue_size=10)
 			
+			
+			#log.publish(goal)
+			#log.publish(start)
+			#log.publish(current_xy)
+			start_time = time.time()
+			while time.time() - start_time < 12:
+				drive_cmd.publish(Vector3(0.2, 0, 0))
+				if not executing_waypoint or not is_alive: break
+			
+			gd, ga, gx, gy = gps_distance(current_xy, goal)
+			sd, sa, sx, sy = gps_distance(start, current_xy)
 			ang = ga - sa
 			deg = math.degrees(ang) % 360
 			deg = (deg + 360) % 360
 			if deg > 180: deg -=360
 			log.publish(Vector3(math.degrees(ga), math.degrees(sa), deg))
 			log.publish(Vector3(gd, sd, 0))
-			#log.publish(goal)
-			#log.publish(start)
-			#log.publish(current_xy)
 			
-			if deg > 10: drive_cmd.publish(Vector3(0.2, 0.1, 0))
-			elif deg < -10: drive_cmd.publish(Vector3(0.2, -0.1, 0))
-			else: drive_cmd.publish(Vector3(0.2, 0, 0))
+			start_time = time.time()
+			if deg > 10 or deg < -10:
+				dur = abs(deg / 30)
+				while time.time() - start_time < dur:
+					if not executing_waypoint or not is_alive: break
+					if deg < -10: turn = Vector3(0, -0.3, 0)
+					elif deg > 10: turn = Vector3(0, 0.3, 0)
+					drive_cmd.publish(turn)
+			
 		rate.sleep()
 
 
