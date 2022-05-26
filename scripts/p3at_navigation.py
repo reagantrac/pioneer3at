@@ -58,17 +58,19 @@ def gps_distance(point1, point2):
 def gps_point(current):
 	global current_xy, goal_xy, start, is_moving, is_alive
 	global executing_waypoint, waypoints_progress, waypoints_list, selected_waypoint, waypoints_loop
-	current_xy = current
+	current_xy = Vector3(current.x+0.3268 , current.y-0.3925, 0)
 	if is_moving: return
 	if not executing_waypoint: return
+	
+	return
 	
 	is_moving = True
 	drive_cmd = rospy.Publisher("/p3at/drive_cmd", Vector3, queue_size=1)
 	
 	# record gps at start of route
 	if start.x == 0 and start.y == 0:
-		start.x = current_xy.x
-		start.y = current_xy.y
+		start.x = current.x
+		start.y = current.y
 	
 	if len(waypoints_list) == 0:
 		stop()
@@ -82,10 +84,13 @@ def gps_point(current):
 	goal = Vector3(waypoints[name]["longitude"], waypoints[name]["latitude"], 0)
 	
 	# check if at goal
-	check_dist, target_bearing, gx, gy = gps_distance(current_xy, goal)
+	check_dist, target_bearing, gx, gy = gps_distance(current, goal)
+	
+	
 	if int(check_dist) < 5:
 		rospy.loginfo(str(check_dist) + " reached goal")
 		waypoints_progress += 1
+		
 		if waypoints_loop: waypoints_progress = waypoints_progress % len(waypoints_list)
 		elif waypoints_progress >= len(waypoints_list): 
 			stop()
@@ -98,26 +103,31 @@ def gps_point(current):
 	
 	# drive 5 seconds straight, needs calibration
 	start_time = time.time()
-	while time.time() - start_time < 8:
+	while time.time() - start_time < 20:
 		if not executing_waypoint or not is_alive: break
-		drive_cmd.publish(Vector3(0.5, 0, 0))
+		drive_cmd.publish(Vector3(0.2, 0, 0))
 
-	_, current_bearing, sx, sy = gps_distance(start, current_xy)
-	#current_xy = Vector3(sx, sy, 0)
-	#goal_xy = Vector3(gx, gy, 0)
+	sd, current_bearing, sx, sy = gps_distance(start, current_xy)
+	
+	log = rospy.Publisher("/p3at/log_xy", Vector3, queue_size=10)
+	log.publish(Vector3(sx, sy, current_bearing))
+	log.publish(Vector3(gx, gy, target_bearing))
 		
 	#rotate to face goal, needs calibration
 	ang = target_bearing - current_bearing
 	deg = math.degrees(ang) % 360
+	deg = (deg + 360) % 360
+	if deg > 180: deg -=360
+	
 	start_time = time.time()
-	dur =  abs((180+deg) % 180 / 40)
-	log = rospy.Publisher("/p3at/log_ang", Vector3, queue_size=1)
+	dur = abs(deg / 30)
+	log = rospy.Publisher("/p3at/log_ang", Vector3, queue_size=10)
 	log.publish(Vector3(dur, deg, ang))
 	
 	while time.time() - start_time < dur:
 		if not executing_waypoint or not is_alive: break
-		if deg < 0 or deg > 180: turn = Vector3(0, -0.3, 0)
-		else: turn = Vector3(0, 0.3, 0)
+		if deg < -10: turn = Vector3(0, -0.3, 0)
+		elif deg > 10: turn = Vector3(0, 0.3, 0)
 		drive_cmd.publish(turn)
 	start = current_xy
 	is_moving = False
@@ -171,8 +181,8 @@ def manual_drive(data):
 		drive_cmd.publish(Vector3(data.x, data.y, 0))
 
 def navigation():
-	global is_alive, alive_timer
-
+	global current_xy, goal_xy, start, is_moving, is_alive, alive_timer
+	global executing_waypoint, waypoints_progress, waypoints_list, selected_waypoint, waypoints_loop
 	rospy.init_node("p3at_navigation")
 	
 	rospy.Subscriber("/p3at/keep_alive", Bool, is_alive)
@@ -184,10 +194,51 @@ def navigation():
 	ui_cmd(String(""))
 	ui_cmd(String(""))
 	
+	offset = Vector3(0.32685 , -0.3928, 0)
+	
 	rate = rospy.Rate(10) # 10hz
 	while not rospy.is_shutdown():
 		alive_timer += 0.1
 		if alive_timer > 0.3: is_alive = False
+		if is_alive and executing_waypoint:
+			if start.x == 0 and start.y == 0: start = current_xy
+			
+			idx = waypoints_list[waypoints_progress]
+			name = list(waypoints.keys())[idx]
+			goal = Vector3(waypoints[name]["longitude"], waypoints[name]["latitude"], 0)
+			
+			gd, ga, gx, gy = gps_distance(current_xy, goal)
+			sd, sa, sx, sy = gps_distance(start, current_xy)
+			
+			if int(gd) < 5:	
+				waypoints_progress += 1
+				
+				if waypoints_loop: waypoints_progress = waypoints_progress % len(waypoints_list)
+				elif waypoints_progress >= len(waypoints_list): 
+					stop()
+					ui_cmd(String(""))
+					return
+				ui_cmd(String(""))
+				idx = waypoints_list[waypoints_progress]
+				name = list(waypoints.keys())[idx]
+				goal = Vector3(waypoints[name]["longitude"], waypoints[name]["latitude"], 0)
+			
+			drive_cmd = rospy.Publisher("/p3at/drive_cmd", Vector3, queue_size=1)
+			log = rospy.Publisher("/p3at/log_ang", Vector3, queue_size=10)
+			
+			ang = ga - sa
+			deg = math.degrees(ang) % 360
+			deg = (deg + 360) % 360
+			if deg > 180: deg -=360
+			log.publish(Vector3(math.degrees(ga), math.degrees(sa), deg))
+			log.publish(Vector3(gd, sd, 0))
+			#log.publish(goal)
+			#log.publish(start)
+			#log.publish(current_xy)
+			
+			if deg > 10: drive_cmd.publish(Vector3(0.2, 0.1, 0))
+			elif deg < -10: drive_cmd.publish(Vector3(0.2, -0.1, 0))
+			else: drive_cmd.publish(Vector3(0.2, 0, 0))
 		rate.sleep()
 
 
