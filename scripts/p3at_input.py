@@ -35,7 +35,6 @@ def read_controller(dev):
 				y = event.value - (stick_max)/2 - stick_min
 				y /= stick_max
 				drive_vec.y = round(-y,1)
-				key_pressed = "k"
 			if event.code == 4:
 				x = event.value - (stick_max)/2 - stick_min
 				x /= stick_max

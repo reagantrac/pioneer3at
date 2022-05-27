@@ -16,7 +16,6 @@ waypoints = {
 	"coffee_time": 					{"longitude": 115.8197862220968, "latitude": -31.98052211397503},
 }
 
-is_moving = False
 is_alive = False
 alive_timer = 0
 
@@ -28,16 +27,14 @@ waypoints_loop = False
 waypoints_progress = 0
 
 # gps navigation variables
-start = Vector3()
-current_xy = Vector3()
-goal_xy = Vector3()
+previous = Vector3()
+current_gps = Vector3()
 
 def stop():
-	global executing_waypoint, waypoints_progress, is_moving, start
+	global executing_waypoint, waypoints_progress, previous
 	executing_waypoint = False
 	waypoints_progress = 0
-	is_moving = False
-	start = Vector3()
+	previous = Vector3()
 
 def gps_distance(point1, point2):
 	lat1 = math.radians(point1.y)
@@ -56,81 +53,8 @@ def gps_distance(point1, point2):
 	return dist, ang, -dist*math.cos(ang), dist*math.sin(ang)
 
 def gps_point(current):
-	global current_xy, goal_xy, start, is_moving, is_alive
-	global executing_waypoint, waypoints_progress, waypoints_list, selected_waypoint, waypoints_loop
-	current_xy = Vector3(current.x+0.3268 , current.y-0.3925, 0)
-	if is_moving: return
-	if not executing_waypoint: return
-	
-	return
-	
-	is_moving = True
-	drive_cmd = rospy.Publisher("/p3at/drive_cmd", Vector3, queue_size=1)
-	
-	# record gps at start of route
-	if start.x == 0 and start.y == 0:
-		start.x = current.x
-		start.y = current.y
-	
-	if len(waypoints_list) == 0:
-		stop()
-
-		ui_cmd(String(""))
-		return
-	
-	# get goal
-	idx = waypoints_list[waypoints_progress]
-	name = list(waypoints.keys())[idx]
-	goal = Vector3(waypoints[name]["longitude"], waypoints[name]["latitude"], 0)
-	
-	# check if at goal
-	check_dist, target_bearing, gx, gy = gps_distance(current, goal)
-	
-	
-	if int(check_dist) < 5:
-		rospy.loginfo(str(check_dist) + " reached goal")
-		waypoints_progress += 1
-		
-		if waypoints_loop: waypoints_progress = waypoints_progress % len(waypoints_list)
-		elif waypoints_progress >= len(waypoints_list): 
-			stop()
-			ui_cmd(String(""))
-			return
-		ui_cmd(String(""))
-		idx = waypoints_list[waypoints_progress]
-		name = list(waypoints.keys())[idx]
-		goal = Vector3(waypoints[name]["longitude"], waypoints[name]["latitude"], 0)
-	
-	# drive 5 seconds straight, needs calibration
-	start_time = time.time()
-	while time.time() - start_time < 20:
-		if not executing_waypoint or not is_alive: break
-		drive_cmd.publish(Vector3(0.2, 0, 0))
-
-	sd, current_bearing, sx, sy = gps_distance(start, current_xy)
-	
-	log = rospy.Publisher("/p3at/log_xy", Vector3, queue_size=10)
-	log.publish(Vector3(sx, sy, current_bearing))
-	log.publish(Vector3(gx, gy, target_bearing))
-		
-	#rotate to face goal, needs calibration
-	ang = target_bearing - current_bearing
-	deg = math.degrees(ang) % 360
-	deg = (deg + 360) % 360
-	if deg > 180: deg -=360
-	
-	start_time = time.time()
-	dur = abs(deg / 30)
-	log = rospy.Publisher("/p3at/log_ang", Vector3, queue_size=10)
-	log.publish(Vector3(dur, deg, ang))
-	
-	while time.time() - start_time < dur:
-		if not executing_waypoint or not is_alive: break
-		if deg < -10: turn = Vector3(0, -0.3, 0)
-		elif deg > 10: turn = Vector3(0, 0.3, 0)
-		drive_cmd.publish(turn)
-	start = current_xy
-	is_moving = False
+	global current_gps
+	current_gps = Vector3(current.x+0.3268 , current.y-0.3925, 0)
 
 def is_alive(data):
 	global is_alive, alive_timer
@@ -181,7 +105,7 @@ def manual_drive(data):
 		drive_cmd.publish(Vector3(data.x, data.y, 0))
 
 def navigation():
-	global current_xy, goal_xy, start, is_moving, is_alive, alive_timer
+	global current_gps, previous, is_alive, alive_timer
 	global executing_waypoint, waypoints_progress, waypoints_list, selected_waypoint, waypoints_loop
 	rospy.init_node("p3at_navigation")
 	
@@ -190,26 +114,25 @@ def navigation():
 	rospy.Subscriber("/p3at/manual_cmd", Vector3, manual_drive)
 	rospy.Subscriber("/p3at/gps", Vector3, gps_point)
 	
-	ui_cmd(String(""))
-	ui_cmd(String(""))
-	ui_cmd(String(""))
-	
-	offset = Vector3(0.32685 , -0.3928, 0)
+	ui_cmd(String("")) # update screen
 	
 	rate = rospy.Rate(10) # 10hz
 	while not rospy.is_shutdown():
+        # check if deadman's switch is pressed
 		alive_timer += 0.1
 		if alive_timer > 0.3: is_alive = False
 		if is_alive and executing_waypoint:
-			if start.x == 0 and start.y == 0: start = current_xy
+			if previous.x == 0 and previous.y == 0: previous = current_gps
 			
+            # get current goal gps point
 			idx = waypoints_list[waypoints_progress]
 			name = list(waypoints.keys())[idx]
 			goal = Vector3(waypoints[name]["longitude"], waypoints[name]["latitude"], 0)
 			
-			gd, ga, gx, gy = gps_distance(current_xy, goal)
-			sd, sa, sx, sy = gps_distance(start, current_xy)
+			gd, ga, gx, gy = gps_distance(current_gps, goal)
+			sd, sa, sx, sy = gps_distance(previous, current_gps)
 			
+            # if at goal go to next point
 			if int(gd) < 5:	
 				waypoints_progress += 1
 				
@@ -226,17 +149,15 @@ def navigation():
 			drive_cmd = rospy.Publisher("/p3at/drive_cmd", Vector3, queue_size=1)
 			log = rospy.Publisher("/p3at/log_ang", Vector3, queue_size=10)
 			
-			
-			#log.publish(goal)
-			#log.publish(start)
-			#log.publish(current_xy)
+			# drive forward
 			start_time = time.time()
 			while time.time() - start_time < 12:
 				drive_cmd.publish(Vector3(0.2, 0, 0))
 				if not executing_waypoint or not is_alive: break
 			
-			gd, ga, gx, gy = gps_distance(current_xy, goal)
-			sd, sa, sx, sy = gps_distance(start, current_xy)
+			# re-evaluate goal direction
+			gd, ga, gx, gy = gps_distance(current_gps, goal)
+			sd, sa, sx, sy = gps_distance(previous, current_gps)
 			ang = ga - sa
 			deg = math.degrees(ang) % 360
 			deg = (deg + 360) % 360
@@ -244,6 +165,7 @@ def navigation():
 			log.publish(Vector3(math.degrees(ga), math.degrees(sa), deg))
 			log.publish(Vector3(gd, sd, 0))
 			
+			# turn on the spot towards the goal
 			start_time = time.time()
 			if deg > 10 or deg < -10:
 				dur = abs(deg / 30)
@@ -253,8 +175,8 @@ def navigation():
 					elif deg > 10: turn = Vector3(0, 0.3, 0)
 					drive_cmd.publish(turn)
 			
+			previous = current_gps
 		rate.sleep()
-
 
 if __name__ == "__main__":
 	try:
