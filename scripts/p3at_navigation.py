@@ -76,7 +76,7 @@ def ui_cmd(data):
 		elif command == "ui_waypoint_loop_toggle":
 			waypoints_loop = not waypoints_loop
 		elif command == "ui_waypoint_execute":
-			executing_waypoint = True
+			executing_waypoint = len(waypoints_list) > 0
 	elif command == "ui_waypoint_cancel": stop()
 	
 	display = rospy.Publisher("/p3at/display/text", String, queue_size=20)
@@ -121,7 +121,7 @@ def navigation():
         # check if deadman's switch is pressed
 		alive_timer += 0.1
 		if alive_timer > 0.3: is_alive = False
-		if is_alive and executing_waypoint:
+		if is_alive and executing_waypoint and len(waypoints_list) != 0:
 			if previous.x == 0 and previous.y == 0: previous = current_gps
 			
             # get current goal gps point
