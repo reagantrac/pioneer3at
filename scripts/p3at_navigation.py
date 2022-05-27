@@ -54,7 +54,7 @@ def gps_distance(point1, point2):
 
 def gps_point(current):
 	global current_gps
-	current_gps = Vector3(current.x+0.3268 , current.y-0.3925, 0)
+	current_gps = Vector3(current.x , current.y, 0)
 
 def is_alive(data):
 	global is_alive, alive_timer
